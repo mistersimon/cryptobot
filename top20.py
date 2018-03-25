@@ -1,4 +1,5 @@
 import strategy
+import exchange
 import fund
 import menu
 
@@ -18,14 +19,17 @@ def fundDef():
                     "XEM",   # NEM - Not on binance
                     "BCN"]   # Bytecoin - Not on binance
 
-  top20 = fund.fund(strategy.equalTop(numCoins, excludedCoins))
+  myStrategy = strategy.equalTop(numCoins, excludedCoins)
+  exchanges = {}
+  exchanges['binance'] = exchange.binance()
+  top20 = fund.fund(myStrategy, exchanges)
 
   #Set filename
   top20.filename = filename
 
   # Load current holdings
   if os.path.exists(filename):
-    top20.holdingLoad(filename)
+    top20.transactionsLoad(filename)
 
   return top20
 

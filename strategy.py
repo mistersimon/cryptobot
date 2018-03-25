@@ -49,8 +49,7 @@ class equalTop(strategy):
     # Get list of symbols
     symbols = tickers['symbol'].tolist()
 
-
-    holdings = [ (k,self.weightage,'%') for k in symbols ]
+    holdings = { k:(self.weightage,'%') for k in symbols }
 
     # Return only the holdings
     return holdings 
