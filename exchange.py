@@ -1,95 +1,116 @@
+""" Class that handles all interactions with various exchanges"""
 from functools import singledispatch
 
 # For trading
 from binance.client import Client
-from binance.enums import *
+from binance.enums import SIDE_BUY, SIDE_SELL, ORDER_TYPE_LIMIT, TIME_IN_FORCE_GTC
+
 import config
 
 
-class exchange():
+# Disable warning about mapper not being implemented as its a single-dispatch method
+# pylint: disable=W0223
+
+class Exchange():
+    """Base class for exchanges, describing api"""
+
+    # pylint: disable=E0213, E1101
+    # Pylint doesn't like the singledispatch decorator
+
     def __init__(self):
         self.mapping = {}
         self.unmapping = {}
-        pass
 
-    
     @singledispatch
-    @classmethod    
     def mapper(pair, mapping):
+        """Overloaded function to swap symbol pairs"""
         raise NotImplementedError('Unsupported type')
 
     @mapper.register(str)
     def _(pair, mapping):
-        """ Converts symbols based on mapping dictionary
-        """
+        """ Converts symbols on string input"""
         pair = pair.split('/')
         for i, sym in enumerate(pair):
             if sym in mapping:
-    #                 print('Changing {} to {}'.format(pair[i], self.remapping[sym]))
+                #                 print('Changing {} to {}'.format(pair[i], self.remapping[sym]))
                 pair[i] = mapping[sym]
-        return ('/'.join(pair))
+        return '/'.join(pair)
 
     @mapper.register(list)
     def _(pairs, mapping):
-        return [ exchange.mapper(x, mapping) for x in pairs ]
+        """ Converts symbols on list input"""
+        return [Exchange.mapper(x, mapping) for x in pairs]
 
     @mapper.register(dict)
     def _(pairs, mapping):
-        return { exchange.mapper(s, mapping):t for s,t in pairs.items()}
+        """ Converts symbols on dict input"""
+        return {Exchange.mapper(s, mapping): t for s, t in pairs.items()}
 
     @mapper.register(tuple)
     def _(pair, mapping):
-        return ( exchange.mapper(pair[0], mapping), pair[1] )
-    
-    def remapDeco(func):
+        """ Converts symbols on tuple input"""
+        return (Exchange.mapper(pair[0], mapping), pair[1])
+
+    @staticmethod
+    def remap_deco(func):
+        """Decorator function to rename symbols if required"""
+
         def wrapper(self, pair):
-            # Covert input from User to exchange symbols
-            inp = exchange.mapper(pair, self.mapping)
-            
-            out = func(self,inp)
-            
-            # Convert output from exchange to user symbols
-            out = exchange.mapper(out, self.unmapping)
-            
+            """Wrapper"""
+            # Covert input from User to Exchange symbols
+            inp = Exchange.mapper(pair, self.mapping)
+
+            out = func(self, inp)
+
+            # Convert output from Exchange to user symbols
+            out = Exchange.mapper(out, self.unmapping)
+
             return out
         return wrapper
-    
-    def getPrice(self, pair): 
+
+    def get_price(self, pair):
         """ Returns price for a single pair
         """
         pass
 
-    def getAllPrices(self, pairs):
+    def get_all_prices(self, pairs):
         """ Returns dictionary of all prices for a list of inputs
         """
         pass
 
-class binance(exchange):
-    def __init__(self):
-        self.client = Client(config.binance_api_key, config.binance_api_secret)
-        self.mapping = {'BCH':'BCC','MIOTA':'IOTA'}
-        self.unmapping = { v:k for k,v in self.mapping.items()}
-        self.cryptoBase = 'BTC'
 
-    @exchange.remapDeco
-    def getPrice(self, pair):
+class Binance(Exchange):
+    """Class for binance exchange"""
+
+    def __init__(self):
+        super().__init__()
+        self.client = Client(config.BINANCE_KEY, config.BINANCE_SECRET)
+        self.mapping = {'BCH': 'BCC', 'MIOTA': 'IOTA'}
+        self.unmapping = {v: k for k, v in self.mapping.items()}
+        self.crypto_base = 'BTC'
+
+    @Exchange.remap_deco
+    def get_price(self, pair):
         pass
-    
-    @exchange.remapDeco
-    def getAllPrices(self, pairs): 
+
+    @Exchange.remap_deco
+    def get_all_prices(self, pairs):
+        """Returns all the prices on binance exchange"""
         prices = {}
-        exchangePrices = self.client.get_all_tickers()
-        # Scrub exchange prices
-        exchangePrices = { x['symbol']:x['price'] for x in exchangePrices }
+        exchange_prices = self.client.get_all_tickers()
+
+        # Scrub Exchange prices
+        exchange_prices = {x['symbol']: x['price'] for x in exchange_prices}
 
         for pair in pairs:
-            
-            prices[pair] = (float(exchangePrices[pair.replace("/","")]), 'Price')
+
+            prices[pair] = (
+                float(exchange_prices[pair.replace("/", "")]), 'Price')
         return prices
-    
-    
-    @exchange.remapDeco
-    def prepareOrder(self, trade):
+
+    @Exchange.remap_deco
+    def prepare_order(self, trade):
+        """Prepares an order that compiles with binance exchange"""
         pair, (amt, unit) = trade
         if pair.find('/') != -1:
             [quote, base] = pair.split('/')
@@ -97,104 +118,120 @@ class binance(exchange):
             quote = pair
             base = pair
 
-        # Determine side for order
-        if amt < 0:
-            side = SIDE_SELL
-            amt = -amt
-        elif amt > 0:
-            side = SIDE_BUY
-        else:
-            return None
-
-        # Get current spread on price
-        if quote == self.cryptoBase:
-            price = 1
-        else:
-            ticker = self.client.get_ticker(symbol=pair.replace('/',''))
-            if side == SIDE_BUY:
-                price = float(ticker['bidPrice'])
-            elif side == SIDE_SELL:
-                price = float(ticker['askPrice'])
+        def order_side(amt):
+            """Determine side for order"""
+            if amt < 0:
+                return (-amt, SIDE_SELL)
+            elif amt > 0:
+                return (amt, SIDE_BUY)
             else:
-                #Code should never reach here. See above if block
-                return None 
-        
+                raise ValueError("Invalid amount of trade")
+
+        amt, side = order_side(amt)
+
+        def determine_price(pair, side):
+            """Get current spread on price"""
+            if pair.find('/') == -1:
+                if pair == self.crypto_base:
+                    price = 1
+                else:
+                    raise ValueError("Incorrect pair")
+            else:
+                ticker = self.client.get_ticker(symbol=pair.replace('/', ''))
+                if side == SIDE_BUY:
+                    price = float(ticker['bidPrice'])
+                elif side == SIDE_SELL:
+                    price = float(ticker['askPrice'])
+                else:
+                    raise ValueError("Incorrect side input")
+
+            return price
+
+        price = determine_price(pair, side)
+
         # Calculate quantity for order
         if unit == quote:
             qty = amt
-        elif base == self.cryptoBase:
+        elif base == self.crypto_base:
             qty = amt/price
         else:
-            raise ValueError('I do not know how to trade {} for {}'.format(pair, unit))
+            raise ValueError(
+                'I do not know how to trade {} for {}'.format(pair, unit))
 
         # Return order
-        order = (pair,(qty, price, side))
+        order = (pair, (qty, price, side))
         return order
 
-    def _filterOrder(self, order):
+    def _filter_order(self, order):
         """Filter order according to BINANCE rules
-        
+
         """
         pair, (qty, price, side) = order
 
-        oldQty = qty
+        old_qty = qty
 
         # Get symbol info from binance
-        info = self.client.get_symbol_info(pair.replace('/',''))
+        info = self.client.get_symbol_info(pair.replace('/', ''))
 
         # Process LOT Size Filters
-        filter = next((item for item in info['filters'] if item["filterType"] == "LOT_SIZE"))
-        minQty = float(filter['minQty'])
-        stepSize = float(filter['stepSize'])
+        criteria = next(
+            (item for item in info['filters'] if item["filterType"] == "LOT_SIZE"))
+
+        min_qty = float(criteria['minQty'])
+        step_size = float(criteria['stepSize'])
 
         # Ensure qty is more than minimum
-        if qty < minQty:
-                qty = minQty 
-            
-        # Ensure qty is a multiple of stepsize
-        if (qty - minQty) % stepSize != 0:
-            qty = stepSize * round(qty/stepSize)
+        if qty < min_qty:
+            qty = min_qty
 
+        # Ensure qty is a multiple of stepsize
+        if (qty - min_qty) % step_size != 0:
+            qty = step_size * round(qty/step_size)
 
         # Handle Notional Size Filters
-        filter = next((item for item in info['filters'] if item["filterType"] == "MIN_NOTIONAL"))
-        min = float(filter['minNotional'])
-        
+        criteria = next(
+            (item for item in info['filters'] if item["filterType"] == "MIN_NOTIONAL"))
+
+        min_vol = float(criteria['minNotional'])
+
         # Increase qty by step size until notional size is reached
-        while qty*price < min:
-            qty += stepSize
+        while qty*price < min_vol:
+            qty += step_size
 
         # Calculate change in quanty
-        delta = round((qty/oldQty-1)*100,2)
+        delta = round((qty/old_qty-1)*100, 2)
 
-        #Convert floats to strings (for binance api)
-        qtyStr = '{:0.0{}f}'.format(qty, 5)
-        priceStr = '{:0.0{}f}'.format(price, 8)
+        # Convert floats to strings (for binance api)
+        qty = '{:0.0{}f}'.format(qty, 5)
+        price = '{:0.0{}f}'.format(price, 8)
 
-        newOrder = (pair, (qtyStr, priceStr, side))
-        return (newOrder, delta)
+        new_order = (pair, (qty, price, side))
+        return (new_order, delta)
 
-    
-    @exchange.remapDeco
-    def excuteOrder(self, order, prompt=True):
+    @Exchange.remap_deco
+    def excute_order(self, order, prompt=True):
+        """Sends an order to the exchange, records on transaction list"""
+        # TODO:- Check if order is actually clears
 
         # Change order to comply with binance filters
-        (order, delta) = self._filterOrder(order)
+        (order, delta) = self._filter_order(order)
 
         # Unpack
         pair, (qty, price, side) = order
 
         # Get conformation (if required)
         if prompt:
-            resp = input('{} {} of {}  for {}. Delta {}%. Approve (Y/n)?'.format(side, qty, pair, price, delta))
+            resp = input(
+                '{} {} of {}  for {}. Delta {}%. Approve (Y/n)?'
+                .format(side, qty, pair, price, delta))
         else:
             resp = None
-      
+
         # Send order to exchange
-        if prompt == False or resp == 'Y':
-            #Simulate order with create_test_order
+        if prompt is False or resp == 'Y':
+            # Simulate order with create_test_order
             self.client.create_test_order(
-                symbol=pair.replace('/',''),
+                symbol=pair.replace('/', ''),
                 quantity=qty,
                 price=price,
                 side=side,
@@ -203,5 +240,5 @@ class binance(exchange):
             )
         else:
             order = {}
-         
+
         return order

@@ -5,51 +5,57 @@ Implementation of a certain fund strategy. Needs to return a target holding at c
 """
 import pandas as pd
 
-class strategy():
-  """ Base class
-  """
-  def targetHolding(self):
-    """ Returns list of tuples with target holdings for portfolio 
 
-    tuple format: (symbol, holding, '%')
-    """
-    pass
+# pylint: disable=too-few-public-methods
+# Using classes to ensure consistent api through different strategies
 
-
-class equalTop(strategy):
-  """ Strategy equally holds the top N coins on CMC at any given time
-  
-  args:
-    numCoins (int): number of top coins to take from CMC
-    excludedCoins (list): List of symbols to exclude from CMC
-  """
-  def __init__(self, numCoins, excludedCoins = []):
-    self.numCoins = numCoins
-    self.excludedCoins = excludedCoins
-
-    # Set weightage equal
-    self.weightage = 1 / numCoins
-    
-
-  def targetHolding(self):
-    """ Returns dictionary target holdings for portfolio 
+class Strategy():
+    """ Base class
     """
 
-    # Grab tickers within search range
-    search_range = self.numCoins + len(self.excludedCoins)
-    url = 'https://api.coinmarketcap.com/v1/ticker/?limit={}'.format(search_range)
-    tickers = pd.read_json(url)
+    def target_holding(self):
+        """ Returns list of tuples with target holdings for portfolio
 
-    # Filter out ones we don't want
-    tickers = tickers.loc[~tickers['symbol'].isin(self.excludedCoins)]
+         tuple format: (symbol, holding, '%')
+         """
+        raise NotImplementedError
 
-    # Take the number of coins we are instrested in
-    tickers = tickers[:self.numCoins]
 
-    # Get list of symbols
-    symbols = tickers['symbol'].tolist()
+class EqualTop(Strategy):
+    """ Strategy equally holds the top N coins on CMC at any given time
 
-    holdings = { k:(self.weightage,'%') for k in symbols }
+    args:
+      num_coins (int): number of top coins to take from CMC
+      excluded_coins (list): List of symbols to exclude from CMC
+    """
 
-    # Return only the holdings
-    return holdings 
+    def __init__(self, num_coins, excluded_coins=None):
+        self.num_coins = num_coins
+        self.excluded_coins = excluded_coins or []
+
+        # Set weightage equal
+        self.weightage = 1 / num_coins
+
+    def target_holding(self):
+        """ Returns dictionary target holdings for portfolio
+        """
+
+        # Grab tickers within search range
+        search_range = self.num_coins + len(self.excluded_coins)
+        url = 'https://api.coinmarketcap.com/v1/ticker/?limit={}'.format(
+            search_range)
+        tickers = pd.read_json(url)
+
+        # Filter out ones we don't want
+        tickers = tickers.loc[~tickers['symbol'].isin(self.excluded_coins)]
+
+        # Take the number of coins we are instrested in
+        tickers = tickers[:self.num_coins]
+
+        # Get list of symbols
+        symbols = tickers['symbol'].tolist()
+
+        holdings = {k: (self.weightage, '%') for k in symbols}
+
+        # Return only the holdings
+        return holdings

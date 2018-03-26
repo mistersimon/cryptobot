@@ -1,2 +1,0 @@
-binance_api_key = ""
-binance_api_secret = ""

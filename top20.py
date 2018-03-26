@@ -1,39 +1,41 @@
+"Defins a strategy that holds the top 20 coins on binance equally"
+import os.path
+
 import strategy
 import exchange
 import fund
 import menu
 
-import os.path
 
-def fundDef():
-  """Fund defintion
-  """
+def fund_def():
+    """Fund defintion
+    """
 
-  # CSV filename containing holdings
-  filename = 'top20.csv'
+    # CSV filename containing holdings
+    filename = 'top20.csv'
 
-  numCoins = 20 # Number of coins to hold
+    num_coins = 20  # Number of coins to hold
 
-  # Lets exclude some coins we don't want
-  excludedCoins = ["USDT",  # Tether - No potential for profit
-                    "XEM",   # NEM - Not on binance
-                    "BCN"]   # Bytecoin - Not on binance
+    # Lets exclude some coins we don't want
+    excluded_coins = ["USDT",  # Tether - No potential for profit
+                      "XEM",   # NEM - Not on binance
+                      "BCN"]   # Bytecoin - Not on binance
 
-  myStrategy = strategy.equalTop(numCoins, excludedCoins)
-  exchanges = {}
-  exchanges['binance'] = exchange.binance()
-  top20 = fund.fund(myStrategy, exchanges)
+    top20_strategy = strategy.EqualTop(num_coins, excluded_coins)
+    exchanges = {}
+    exchanges['binance'] = exchange.Binance()
+    top20 = fund.Fund(top20_strategy, exchanges)
 
-  #Set filename
-  top20.filename = filename
+    # Set filename
+    top20.filename = filename
 
-  # Load current holdings
-  if os.path.exists(filename):
-    top20.transactionsLoad(filename)
+    # Load current holdings
+    if os.path.exists(filename):
+        top20.transactions_load()
 
-  return top20
+    return top20
+
 
 if __name__ == '__main__':
-  fund = fundDef()
-  menu.menu(fund)
-
+    FUND = fund_def()
+    menu.enter_menu(FUND)

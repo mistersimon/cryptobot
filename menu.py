@@ -1,81 +1,76 @@
-""" Simple CLI menu driven interface for fund class
+"""Simple CLI menu driven interface for fund class
 """
 
-def menu(fund):
-  #Dictionary of tuples with prompt and handler
-  menu = {}
 
-  """ Exit """
-  def exitHandler():
-    fund.transactionsSave()
-    exit()
-  menu['q'] = ("Exit", exitHandler)
+def enter_menu(fund):
+    """Runs a simple text driven menu"""
+    # Dictionary of tuples with prompt and handler
+    menu = {}
 
-  """ View Current Holdings """
-  def currentHoldings():
-    print("Current Holdings: ", fund.current_holdings())
-    (NAV, holdings) = fund.NAV()
-    print("Current Holdings (in BTC): " ,holdings)
-    print("Current portfolio value (in BTC): " , NAV)
+    def exit_handler():
+        """ Exit """
+        fund.transactions_save()
+        exit()
 
-  menu['1'] = ("View current holding", currentHoldings)
+    def current_holdings():
+        """ View Current Holdings """
+        print("Current Holdings: ", fund.current_holdings())
+        (nav, holdings) = fund.nav()
+        print("Current Holdings (in BTC): ", holdings)
+        print("Current portfolio value (in BTC): ", nav)
 
-  """ View Pending Trades Capital """
-  def printPendingTrades():
-    # print("Pending trades:\n   ", '\n    '.join(map(str,fund.getPendingTrades())))
-    trades = fund.getPendingTrades() 
-    print(trades)
-    print('Number of trades pending: {}'.format(len(trades)))
+    def pending_trades():
+        """ View Pending Trades Capital """
+        # print("Pending trades:\n   ", '\n    '.join(map(str,fund.getPendingTrades())))
+        trades = fund.get_pending_trades()
+        print(trades)
+        print('Number of trades pending: {}'.format(len(trades)))
 
-  menu['2'] = ("View pending trades", printPendingTrades)
+    def add_funds():
+        """ Add Capital """
+        amount = float(input("How much do you want to invest? (BTC): "))
+        fund.capital_add(amount)
+        print('Invested {} in pending trades.'.format(amount))
 
-  """ Add Capital """
-  def addFunds():
-    amount = float(input("How much do you want to invest? (BTC): "))
-    fund.capital_add(amount)
-    print('Invested {} in pending trades.'.format(amount))
+    def rebalance():
+        """ Rebalance Portfolio """
+        fund.rebalance()
+        print('Fund Rebalanced')
 
-  menu['3'] = ("Add Funds", addFunds)
+    def excute_trade():
+        """ Excute pending Trades """
+        print("Trades to be excuted:")
+        pending_trades()
+        excute = input("Proceed with excuction? (Y/n)")
+        if excute == "Y":
+            fund.excute_trades()
+        else:
+            print("Excutation cancel")
 
-  """ Rebalance Portfolio """
-  def rebalance():
-    fund.rebalance()
-    print('Fund Rebalanced')
+    def clear_trade():
+        """ Clear pending Trades """
+        print("Trades cleared")
+        fund.trades_pending = {}
 
-  menu['4'] = ("Rebalance portfolio", rebalance)
+    menu['1'] = ("View current holding", current_holdings)
+    menu['2'] = ("View pending trades", pending_trades)
+    menu['3'] = ("Add Funds", add_funds)
+    menu['4'] = ("Rebalance portfolio", rebalance)
+    menu['5'] = ("Excute pending trades", excute_trade)
+    menu['6'] = ("Clear pending trades", clear_trade)
+    menu['q'] = ("Exit", exit_handler)
 
-  """ Excute pending Trades """
-  def excuteTrades():
-    print("Trades to be excuted:")
-    printPendingTrades()
-    excute = input("Proceed with excuction? (Y/n)")
-    if excute == "Y":
-      fund.excuteTrades()
-    else:
-      "Excutation cancel"
+    while True:
+        # Clear screen
+        print(chr(27) + "[2J")
 
-  menu['5'] = ("Excute pending trades", excuteTrades)
+        # Print all options
+        for entry in sorted(menu.keys()):
+            print(entry, menu[entry][0])
 
+        selection = input("Please select option: ")
 
-  """ Clear pending Trades """
-  def clearTrades():
-    print("Trades cleared")
-    fund.tradesPending = {}
+        # Run menu handler
+        menu[selection][1]()
 
-  menu['6'] = ("Clear pending trades", clearTrades)
-
-
-  while True:
-    # Clear screen
-    print(chr(27) + "[2J")
-
-    # Print all options
-    for entry in sorted(menu.keys()):
-      print(entry, menu[entry][0])
-    
-    selection = input("Please select option: ")
-
-    # Run menu handler
-    menu[selection][1]()
-
-    input("Press any key to return to menu")
+        input("Press any key to return to menu")
