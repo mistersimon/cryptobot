@@ -1,15 +1,10 @@
-"""Fund class
-
+"""
 This class implements functionality to adminstrate a fund.
-
+It exposes functions that add, rebalance, report holdings.
 """
 
+import os.path
 import pandas as pd
-
-# For trading
-from binance.client import Client
-# from binance.enums import *
-import config
 
 
 class Fund():
@@ -17,32 +12,35 @@ class Fund():
 
     Args:
       strategy (obj): A strategy class that defines the strategy of the portfolio
+      exchange (obj): A dictionary of exchange classes
+      filename (str): String of CSV file to store transactions
       fiat_base (str): Default reporting category for fiat
       crypto_base (str): Default reporting category for crypto
 
     Attributes:
       trades_pending (list): List of tuples containings trades to excute
       holdings (DataFrame): Table of coins and holding
-      filename (str): Location of csv containing holdings
 
     """
 
     # pylint: disable=too-many-instance-attributes
     # 8 is a reasonable number of attributes
 
-    def __init__(self, strategy, exchanges, fiat_base='USD', crypto_base='BTC'):
+    def __init__(self, strategy, exchanges, filename=None, fiat_base='USD', crypto_base='BTC'):
+        # pylint: disable=R0913
+        # 6 arguments okay in this instance
 
         self.strategy = strategy
         self.exchanges = exchanges
+        self.filename = filename
         self.fiat_base = fiat_base
         self.crypto_base = crypto_base
         self.trades_pending = {}
         self.transactions = pd.DataFrame()
-        self.filename = None
 
-        # Intialise binance client with api keys
-        self.binance = Client(config.BINANCE_KEY,
-                              config.BINANCE_SECRET)
+        # Load current holdings
+        if os.path.exists(self.filename):
+            self.transactions_load()
 
     def nav(self):
         """Calculates the current worth of the portfolio"""

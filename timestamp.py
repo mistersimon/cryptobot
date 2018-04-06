@@ -1,4 +1,9 @@
-"""Checks time difference between local time and binance server time"""
+"""
+Checks time difference between local time and binance server time
+
+code from: https://github.com/sammchardy/python-binance/issues/2
+
+"""
 
 import time
 

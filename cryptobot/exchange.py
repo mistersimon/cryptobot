@@ -1,4 +1,7 @@
-""" Class that handles all interactions with various exchanges"""
+"""
+Class that handles all interactions with the exchanges. Has a base class defining
+the shared api and child classes for the exchanges
+"""
 from functools import singledispatch
 
 # For trading
@@ -230,7 +233,7 @@ class Binance(Exchange):
         # Send order to exchange
         if prompt is False or resp == 'Y':
             # Simulate order with create_test_order
-            self.client.create_test_order(
+            self.client.create_order(
                 symbol=pair.replace('/', ''),
                 quantity=qty,
                 price=price,

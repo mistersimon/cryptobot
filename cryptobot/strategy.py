@@ -10,7 +10,8 @@ import pandas as pd
 # Using classes to ensure consistent api through different strategies
 
 class Strategy():
-    """ Base class
+    """
+    Returns a list of the desired holdings of the startegy at the time of running. 
     """
 
     def target_holding(self):
